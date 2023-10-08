@@ -72,7 +72,7 @@ class DeepSpeech2Model(BaseModel):
         x = self.fc(x)
         x = x.view((t_dim, n_dim, -1)).transpose(0, 1)
         # N x T x n_class
-        return {"logits": self.softmax(x)}
+        return {"logits": x}
 
     def transform_input_lengths(self, input_lengths):
         t_dim = input_lengths.max()
