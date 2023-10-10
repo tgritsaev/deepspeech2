@@ -13,4 +13,5 @@ class CTCLossWrapper(CTCLoss):
             targets=text_encoded,
             input_lengths=log_probs_length,
             target_lengths=text_encoded_length,
+            zero_infinity=True
         )
