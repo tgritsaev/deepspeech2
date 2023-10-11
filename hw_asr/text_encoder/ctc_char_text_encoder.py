@@ -3,6 +3,7 @@ from typing import List, NamedTuple
 import torch
 
 from .char_text_encoder import CharTextEncoder
+from collections import defaultdict
 
 
 class Hypothesis(NamedTuple):
@@ -30,15 +31,41 @@ class CTCCharTextEncoder(CharTextEncoder):
             last_char = cur_char
         return ''.join(result)
 
-    def ctc_beam_search(self, probs: torch.tensor, probs_length,
-                        beam_size: int = 100) -> List[Hypothesis]:
+    def ctc_beam_search(self, probs: torch.tensor, probs_length, beam_size: int = 4) -> List[Hypothesis]:
         """
-        Performs beam search and returns a list of pairs (hypothesis, hypothesis probability).
+            Performs beam search and returns a list of pairs (hypothesis, hypothesis probability).
         """
         assert len(probs.shape) == 2
         char_length, voc_size = probs.shape
         assert voc_size == len(self.ind2char)
         hypos: List[Hypothesis] = []
         # TODO: your code here
-        raise NotImplementedError
+
+        def extend_and_merge(frame, state):
+            new_state = defaultdict(float)
+            for next_char_index, next_char_proba in enumerate(frame):
+                for (pref, last_char), pref_proba in state.items():
+                    next_char = self.ind2char[next_char_index]
+                    if next_char == last_char:
+                        new_pref = pref
+                    else:
+                        if next_char != self.EMPTY_TOK:
+                            new_pref = pref + next_char
+                        else:
+                            new_pref = pref
+                        last_char = next_char
+                    new_state[(new_pref, last_char)] += pref_proba * next_char_proba
+            return new_state
+
+        def truncate(state, beam_size):
+            state_list = list(state.items())
+            state_list.sort(key=lambda x: -x[1])
+            return dict(state_list[:beam_size])
+
+        state = {('', self.EMPTY_TOK): 1.0}
+        for frame in probs:
+            state = extend_and_merge(frame, state, self.ind2char)
+            state = truncate(state, beam_size)
+        state_list = list(state.items())
+        state_list.sort(key=lambda x: -x[1])
         return sorted(hypos, key=lambda x: x.prob, reverse=True)

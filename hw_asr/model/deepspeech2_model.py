@@ -4,7 +4,7 @@ from torch import nn
 from hw_asr.base import BaseModel
 
 
-class BatchRNN(nn.Module):
+class RNNwBatchNorm(nn.Module):
     def __init__(self, input_size, hidden_size):
         super().__init__()
         self.rnn = nn.GRU(input_size, hidden_size, batch_first=False, bidirectional=True)
@@ -48,14 +48,14 @@ class DeepSpeech2Model(BaseModel):
         rnn_input_size = (rnn_input_size - 21) // 2 + 1
         rnn_input_size *= 96
         self.rnns = nn.Sequential(
-            BatchRNN(rnn_input_size, rnn_hidden_size),
-            *(BatchRNN(rnn_hidden_size, rnn_hidden_size) for _ in range(n_rnn_layers - 1))
+            RNNwBatchNorm(rnn_input_size, rnn_hidden_size),
+            *(RNNwBatchNorm(rnn_hidden_size, rnn_hidden_size) for _ in range(n_rnn_layers - 1))
         )
 
         self.fc = nn.Linear(in_features=rnn_hidden_size, out_features=n_class)
         self.softmax = nn.Softmax(dim=2)
 
-    def forward(self, spectrogram, spectrogram_length, ** batch):
+    def forward(self, spectrogram, spectrogram_length, **batch):
         # N x big_F x big_T
         x = self.conv(spectrogram.unsqueeze(1))
         # N x C x F x T

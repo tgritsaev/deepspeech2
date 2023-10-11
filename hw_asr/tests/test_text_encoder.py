@@ -15,4 +15,8 @@ class TestTextEncoder(unittest.TestCase):
 
     def test_beam_search(self):
         # TODO: (optional) write tests for beam search
-        pass
+        text_encoder = CTCCharTextEncoder()
+
+        len(text_encoder.ind2char)
+        probs
+        text_encoder.ctc_beam_search()

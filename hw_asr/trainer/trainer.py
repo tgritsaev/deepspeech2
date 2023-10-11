@@ -204,6 +204,7 @@ class Trainer(BaseTrainer):
             log_probs,
             log_probs_length,
             audio_path,
+            audio,
             examples_to_log=10,
             *args,
             **kwargs,
@@ -218,15 +219,16 @@ class Trainer(BaseTrainer):
         ]
         argmax_texts_raw = [self.text_encoder.decode(inds) for inds in argmax_inds]
         argmax_texts = [self.text_encoder.ctc_decode(inds) for inds in argmax_inds]
-        tuples = list(zip(argmax_texts, text, argmax_texts_raw, audio_path))
+        tuples = list(zip(argmax_texts, text, argmax_texts_raw, audio_path, audio))
         shuffle(tuples)
         rows = {}
-        for pred, target, raw_pred, audio_path in tuples[:examples_to_log]:
+        for pred, target, raw_pred, audio_path, audio in tuples[:examples_to_log]:
             target = BaseTextEncoder.normalize_text(target)
             wer = calc_wer(target, pred) * 100
             cer = calc_cer(target, pred) * 100
             rows[Path(audio_path).name] = {
-                "audio": self.writer.wandb.Audio(audio_path),  # inaccurate, but no changes in the template
+                "orig_audio": self.writer.wandb.Audio(audio_path),  # inaccurate, but no changes in the template
+                "augm_audio": self.writer.wandb.Audio(audio.squeeze().numpy(), sample_rate=16000),  # inaccurate, but no changes in the template
                 "target": target,
                 "raw prediction": raw_pred,
                 "predictions": pred,
