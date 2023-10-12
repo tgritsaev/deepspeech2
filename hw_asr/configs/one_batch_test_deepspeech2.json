@@ -13,10 +13,13 @@
   },
   "augmentations": {
     "wave": [
-        {
-            "type": "Gain",
-            "args": {"p": 1}
-        }
+        {"type": "AddColoredNoise", "args": {"p": 0.3, "sample_rate": 16000}},
+        {"type": "Gain", "args": {"p": 0.4, "sample_rate": 16000}},
+        {"type": "HighPassFilter", "args": {"p": 0.3, "sample_rate": 16000}},
+        {"type": "LowPassFilter", "args": {"p": 0.3, "sample_rate": 16000}},
+        {"type": "PitchShift", "args": {"p": 0.3, "sample_rate": 16000}},
+        {"type": "PolarityInversion", "args": {"p": 0, "sample_rate": 16000}},
+        {"type": "Shift", "args": {"p": 0.2, "sample_rate": 16000}}
     ],
     "spectrogram": []
   },
