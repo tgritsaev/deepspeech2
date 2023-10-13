@@ -1,6 +1,5 @@
 import random
 from typing import Callable
-
 from torch import Tensor
 
 
