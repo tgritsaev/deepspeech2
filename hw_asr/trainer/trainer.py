@@ -156,6 +156,8 @@ class Trainer(BaseTrainer):
 
         metrics.update("loss", batch["loss"].item())
         for met in self.metrics:
+            if is_train and "beam search" in met.name:
+                continue
             metrics.update(met.name, met(**batch))
         return batch
 
@@ -226,7 +228,6 @@ class Trainer(BaseTrainer):
         probs = np.exp(log_probs.detach().cpu().numpy())
         probs_length = log_probs_length.detach().cpu().numpy()
         BS_hypotheses = [self.text_encoder.ctc_beam_search(prob[:prob_length], 4) for prob, prob_length in zip(probs, probs_length)]
-        print(BS_hypotheses)
         
         tuples = list(zip(argmax_texts, BS_hypotheses, text, argmax_texts_raw, audio_path, audio))
         shuffle(tuples)
