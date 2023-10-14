@@ -4,6 +4,7 @@ from random import shuffle
 
 import PIL
 import pandas as pd
+import numpy as np
 import torch
 import torch.nn.functional as F
 from torch.nn.utils import clip_grad_norm_
@@ -212,6 +213,7 @@ class Trainer(BaseTrainer):
         # TODO: implement logging of beam search results
         if self.writer is None:
             return
+        
         argmax_inds = log_probs.cpu().argmax(-1).numpy()
         argmax_inds = [
             inds[: int(ind_len)]
@@ -219,21 +221,34 @@ class Trainer(BaseTrainer):
         ]
         argmax_texts_raw = [self.text_encoder.decode(inds) for inds in argmax_inds]
         argmax_texts = [self.text_encoder.ctc_decode(inds) for inds in argmax_inds]
-        tuples = list(zip(argmax_texts, text, argmax_texts_raw, audio_path, audio))
+        
+        probs = np.exp(log_probs.detach().cpu().numpy())
+        probs_length = log_probs_length.detach().cpu().numpy()
+        BS_hypotheses = [self.text_encoder.ctc_beam_search(prob[:prob_length], 4) for prob, prob_length in zip(probs, probs_length)]
+        print(BS_hypotheses)
+        
+        tuples = list(zip(argmax_texts, BS_hypotheses, text, argmax_texts_raw, audio_path, audio))
         shuffle(tuples)
         rows = {}
-        for pred, target, raw_pred, audio_path, audio in tuples[:examples_to_log]:
+        for pred, BS_hypos, target, raw_pred, audio_path, audio in tuples[:examples_to_log]:
             target = BaseTextEncoder.normalize_text(target)
             wer = calc_wer(target, pred) * 100
             cer = calc_cer(target, pred) * 100
+            BS_pred = BS_hypos
+            BS_wer = calc_wer(target, BS_pred) * 100
+            BS_cer = calc_cer(target, BS_pred) * 100
+            
             rows[Path(audio_path).name] = {
                 "orig_audio": self.writer.wandb.Audio(audio_path),  # inaccurate, but no changes in the template
                 "augm_audio": self.writer.wandb.Audio(audio.squeeze().numpy(), sample_rate=16000),  # inaccurate, but no changes in the template
                 "target": target,
                 "raw prediction": raw_pred,
                 "predictions": pred,
+                "BS prediction": BS_pred,
                 "wer": wer,
                 "cer": cer,
+                "BS wer": BS_wer,
+                "BS cer": BS_cer,
             }
         self.writer.add_table("predictions", pd.DataFrame.from_dict(rows, orient="index"))
 
