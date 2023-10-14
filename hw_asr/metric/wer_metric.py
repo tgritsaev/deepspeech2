@@ -1,5 +1,6 @@
 from typing import List
 
+import numpy as np
 import torch
 from torch import Tensor
 
@@ -23,5 +24,25 @@ class ArgmaxWERMetric(BaseMetric):
                 pred_text = self.text_encoder.ctc_decode(log_prob_vec[:length])
             else:
                 pred_text = self.text_encoder.decode(log_prob_vec[:length])
+            wers.append(calc_wer(target_text, pred_text))
+        return sum(wers) / len(wers)
+    
+    
+class BeamSearchWERMetric(BaseMetric):
+    def __init__(self, text_encoder: BaseTextEncoder, beam_size: int, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.text_encoder = text_encoder
+        self.beam_size = beam_size
+
+    def __call__(self, log_probs: Tensor, log_probs_length: Tensor, text: List[str], **kwargs):
+        wers = []
+        probs = np.exp(log_probs.detach().cpu().numpy())
+        lengths = log_probs_length.detach().numpy()
+        for prob, length, target_text in zip(probs, lengths, text):
+            target_text = BaseTextEncoder.normalize_text(target_text)
+            if hasattr(self.text_encoder, "ctc_beam_search"):
+                pred_text = self.text_encoder.ctc_beam_search(prob[:length], self.beam_size)
+            else:
+                assert False
             wers.append(calc_wer(target_text, pred_text))
         return sum(wers) / len(wers)
