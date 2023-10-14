@@ -202,6 +202,7 @@ class Trainer(BaseTrainer):
     def _log_predictions(
             self,
             text,
+            logits,
             log_probs,
             log_probs_length,
             audio_path,

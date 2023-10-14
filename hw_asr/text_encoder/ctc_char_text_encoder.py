@@ -1,7 +1,11 @@
 from typing import List, NamedTuple
 
 import torch
+# import kenlm
+from pyctcdecode import build_ctcdecoder
 
+
+from hw_asr.base.base_text_encoder import BaseTextEncoder
 from .char_text_encoder import CharTextEncoder
 from collections import defaultdict
 
@@ -14,11 +18,13 @@ class Hypothesis(NamedTuple):
 class CTCCharTextEncoder(CharTextEncoder):
     EMPTY_TOK = "^"
 
-    def __init__(self, alphabet: List[str] = None):
+    def __init__(self, alphabet: List[str] = None, kenlm_model_path: str = None, unigrams_path: str = None):
         super().__init__(alphabet)
         vocab = [self.EMPTY_TOK] + list(self.alphabet)
         self.ind2char = dict(enumerate(vocab))
         self.char2ind = {v: k for k, v in self.ind2char.items()}
+        if kenlm_model_path is not None:
+            self.decoder = build_ctcdecoder(vocab, kenlm_model_path=kenlm_model_path, unigrams=unigrams_path)
 
     def ctc_decode(self, inds: List[int]) -> str:
         # TODO: your code here
@@ -73,3 +79,7 @@ class CTCCharTextEncoder(CharTextEncoder):
         #     hypos.append(Hypothesis(state[0][0], state[1]))
         
         return state_list[0][0][0]
+    
+    def ctc_lm_beam_search(self, logits: torch.tensor) -> str:
+        assert self.decoder is not None
+        return BaseTextEncoder.normalize_text(self.decoder.decode(logits))

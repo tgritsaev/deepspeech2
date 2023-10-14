@@ -13,10 +13,10 @@ class TestTextEncoder(unittest.TestCase):
         decoded_text = text_encoder.ctc_decode(inds)
         self.assertIn(decoded_text, true_text)
 
-    def test_beam_search(self):
-        # TODO: (optional) write tests for beam search
-        text_encoder = CTCCharTextEncoder()
+    # def test_beam_search(self):
+    #     # TODO: (optional) write tests for beam search
+    #     text_encoder = CTCCharTextEncoder()
 
-        len(text_encoder.ind2char)
-        probs
-        text_encoder.ctc_beam_search()
+    #     len(text_encoder.ind2char)
+    #     probs
+    #     text_encoder.ctc_beam_search()

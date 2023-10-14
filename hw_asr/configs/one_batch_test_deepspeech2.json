@@ -1,6 +1,13 @@
 {
   "name": "one_batch_test",
   "n_gpu": 1,
+  "text_encoder": {
+    "type": "CTCCharTextEncoder",
+    "args": {
+        "kenlm_model_path": "/Users/timgritsaev/Desktop/dla/asr_project_template/hw_asr/text_encoder/3-gram.arpa",
+        "unigrams_path": "/Users/timgritsaev/Desktop/dla/asr_project_template/hw_asr/text_encoder/librispeech-lexicon.txt"
+    }
+  },
   "preprocessing": {
     "sr": 16000,
     "spectrogram": {
