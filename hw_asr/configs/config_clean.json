@@ -1,12 +1,19 @@
 {
   "name": "default_config",
   "n_gpu": 1,
+  "text_encoder": {
+    "type": "CTCCharTextEncoder",
+    "args": {
+        "kenlm_model_path": "/home/mkairov/biology_research/dla_hw1/hw_asr/text_encoder/3-gram.arpa",
+        "unigrams_path": "/home/mkairov/biology_research/dla_hw1/hw_asr/text_encoder/librispeech-vocab.txt"
+    }
+  },
   "preprocessing": {
     "sr": 16000,
     "spectrogram": {
       "type": "MelSpectrogram",
       "args": {
-        "n_mels": 512
+        "n_mels": 256
       }
     },
     "log_spec": true
@@ -27,15 +34,16 @@
   "arch": {
     "type": "DeepSpeech2Model",
     "args": {
-      "n_feats": 512,
+      "n_feats": 256,
       "n_rnn_layers": 5,
-      "rnn_hidden_size": 512
+      "rnn_hidden_size": 512,
+      "rnn_dropout": 0.2
     }
   },
   "data": {
     "train": {
-      "batch_size": 64,
-      "num_workers": 8,
+      "batch_size": 128,
+      "num_workers": 4,
       "datasets": [
         {
           "type": "LibrispeechDataset",
@@ -65,7 +73,7 @@
     },
     "val": {
       "batch_size": 64,
-      "num_workers": 8,
+      "num_workers": 4,
       "datasets": [
         {
           "type": "LibrispeechDataset",
@@ -77,7 +85,7 @@
     },
     "test-other": {
       "batch_size": 64,
-      "num_workers": 8,
+      "num_workers": 4,
       "datasets": [
         {
           "type": "LibrispeechDataset",
@@ -89,7 +97,7 @@
     },
     "test-clean": {
       "batch_size": 64,
-      "num_workers": 8,
+      "num_workers": 4,
       "datasets": [
         {
           "type": "LibrispeechDataset",
@@ -103,7 +111,7 @@
   "optimizer": {
     "type": "AdamW",
     "args": {
-      "lr": 3e-3,
+      "lr": 5e-4,
       "weight_decay": 1e-3
     }
   },
@@ -123,16 +131,42 @@
       "args": {
         "name": "CER (argmax)"
       }
+    },
+    {
+      "type": "BeamSearchWERMetric",
+      "args": {
+        "beam_size": 4,
+        "name": "WER (beam search)"
+      }
+    },
+    {
+      "type": "BeamSearchCERMetric",
+      "args": {
+        "beam_size": 4,
+        "name": "CER (beam search)"
+      }
+    },
+    {
+      "type": "LanguageModelWERMetric",
+      "args": {
+        "name": "WER (LM)"
+      }
+    },
+    {
+      "type": "LanguageModelCERMetric",
+      "args": {
+        "name": "CER (LM)"
+      }
     }
   ],
   "lr_scheduler": {
     "type": "OneCycleLR",
     "args": {
-      "steps_per_epoch": 100,
+      "steps_per_epoch": 1000,
       "epochs": 50,
       "anneal_strategy": "cos",
-      "max_lr": 3e-4,
-      "pct_start": 0.2
+      "max_lr": 5e-4,
+      "pct_start": 0.1
     }
   },
   "trainer": {
@@ -144,7 +178,7 @@
     "early_stop": 100,
     "visualize": "wandb",
     "wandb_project": "asr_project",
-    "len_epoch": 100,
+    "len_epoch": 1000,
     "grad_norm_clip": 10
   }
 }

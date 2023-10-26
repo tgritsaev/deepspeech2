@@ -1,7 +1,6 @@
 from typing import List, NamedTuple
 
 import torch
-# import kenlm
 from pyctcdecode import build_ctcdecoder
 
 
@@ -24,7 +23,9 @@ class CTCCharTextEncoder(CharTextEncoder):
         self.ind2char = dict(enumerate(vocab))
         self.char2ind = {v: k for k, v in self.ind2char.items()}
         if kenlm_model_path is not None:
-            self.decoder = build_ctcdecoder(vocab, kenlm_model_path=kenlm_model_path, unigrams=unigrams_path)
+            with open(unigrams_path) as f:
+                unigrams = [line.strip() for line in f.readlines()]
+            self.decoder = build_ctcdecoder(labels=[""] + self.alphabet, kenlm_model_path=kenlm_model_path, unigrams=unigrams)
 
     def ctc_decode(self, inds: List[int]) -> str:
         # TODO: your code here
@@ -82,4 +83,4 @@ class CTCCharTextEncoder(CharTextEncoder):
     
     def ctc_lm_beam_search(self, logits: torch.tensor) -> str:
         assert self.decoder is not None
-        return BaseTextEncoder.normalize_text(self.decoder.decode(logits))
+        return self.decoder.decode(logits, beam_width=500).lower()

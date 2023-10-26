@@ -86,7 +86,7 @@ class Trainer(BaseTrainer):
         self.train_metrics.reset()
         self.writer.add_scalar("epoch", epoch)
         for batch_idx, batch in enumerate(
-                tqdm(self.train_dataloader, desc="train", total=self.len_epoch)
+                tqdm(self.train_dataloader, desc="train", total=self.len_epoch - 1)
         ):
             try:
                 batch = self.process_batch(
@@ -122,7 +122,7 @@ class Trainer(BaseTrainer):
                 # because we are interested in recent train metrics
                 last_train_metrics = self.train_metrics.result()
                 self.train_metrics.reset()
-            if batch_idx >= self.len_epoch:
+            if batch_idx + 1 >= self.len_epoch:
                 break
         log = last_train_metrics
 
@@ -132,7 +132,7 @@ class Trainer(BaseTrainer):
 
         return log
 
-    def process_batch(self, batch, is_train: bool, metrics: MetricTracker):
+    def process_batch(self, batch, is_train: bool, metrics: MetricTracker, part: str = None, epoch: int = None):
         batch = self.move_batch_to_device(batch, self.device)
         if is_train:
             self.optimizer.zero_grad()
@@ -156,7 +156,10 @@ class Trainer(BaseTrainer):
 
         metrics.update("loss", batch["loss"].item())
         for met in self.metrics:
-            if is_train and "beam search" in met.name:
+            is_not_test = is_train or ('val' in part)
+            is_test = (not is_not_test)
+            hard_to_calc_metric = "beam search" in met.name or "LM" in met.name
+            if hard_to_calc_metric and (is_not_test or (is_test and (epoch % 25) != 0)):
                 continue
             metrics.update(met.name, met(**batch))
         return batch
@@ -180,6 +183,8 @@ class Trainer(BaseTrainer):
                     batch,
                     is_train=False,
                     metrics=self.evaluation_metrics,
+                    part=part,
+                    epoch=epoch
                 )
             self.writer.set_step(epoch * self.len_epoch, part)
             self._log_predictions(**batch)
@@ -217,6 +222,14 @@ class Trainer(BaseTrainer):
         if self.writer is None:
             return
         
+        ids = np.random.choice(len(text), examples_to_log, replace=False)
+        text = [text[i] for i in ids]
+        logits = logits[ids]
+        log_probs = log_probs[ids]
+        log_probs_length = log_probs_length[ids]
+        audio_path = [audio_path[i] for i in ids]
+        audio = [audio[i] for i in ids]
+        
         argmax_inds = log_probs.cpu().argmax(-1).numpy()
         argmax_inds = [
             inds[: int(ind_len)]
@@ -227,30 +240,38 @@ class Trainer(BaseTrainer):
         
         probs = np.exp(log_probs.detach().cpu().numpy())
         probs_length = log_probs_length.detach().cpu().numpy()
-        BS_hypotheses = [self.text_encoder.ctc_beam_search(prob[:prob_length], 4) for prob, prob_length in zip(probs, probs_length)]
+        bs_preds = [self.text_encoder.ctc_beam_search(prob[:prob_length], 4) for prob, prob_length in zip(probs, probs_length)]
         
-        tuples = list(zip(argmax_texts, BS_hypotheses, text, argmax_texts_raw, audio_path, audio))
-        shuffle(tuples)
+        logits = logits.detach().cpu().numpy()
+        lm_preds = [self.text_encoder.ctc_lm_beam_search(logit[:length]) for logit, length in zip(logits, probs_length)]
+        
+        tuples = list(zip(argmax_texts, bs_preds, lm_preds, text, argmax_texts_raw, audio_path, audio))
         rows = {}
-        for pred, BS_hypos, target, raw_pred, audio_path, audio in tuples[:examples_to_log]:
+        for pred, bs_pred, lm_pred, target, raw_pred, audio_path, audio in tuples:
             target = BaseTextEncoder.normalize_text(target)
             wer = calc_wer(target, pred) * 100
             cer = calc_cer(target, pred) * 100
-            BS_pred = BS_hypos
-            BS_wer = calc_wer(target, BS_pred) * 100
-            BS_cer = calc_cer(target, BS_pred) * 100
+            
+            bs_wer = calc_wer(target, bs_pred) * 100
+            bs_cer = calc_cer(target, bs_pred) * 100
+            
+            lm_wer = calc_wer(target, lm_pred) * 100
+            lm_cer = calc_cer(target, lm_pred) * 100
             
             rows[Path(audio_path).name] = {
                 "orig_audio": self.writer.wandb.Audio(audio_path),  # inaccurate, but no changes in the template
                 "augm_audio": self.writer.wandb.Audio(audio.squeeze().numpy(), sample_rate=16000),  # inaccurate, but no changes in the template
                 "target": target,
-                "raw prediction": raw_pred,
-                "predictions": pred,
-                "BS prediction": BS_pred,
+                "raw pred": raw_pred,
+                "pred": pred,
+                "bs pred": bs_pred,
+                "lm pred": lm_pred,
                 "wer": wer,
                 "cer": cer,
-                "BS wer": BS_wer,
-                "BS cer": BS_cer,
+                "bs wer": bs_wer,
+                "bs cer": bs_cer,
+                "lm wer": lm_wer,
+                "lm cer": lm_cer,
             }
         self.writer.add_table("predictions", pd.DataFrame.from_dict(rows, orient="index"))
 

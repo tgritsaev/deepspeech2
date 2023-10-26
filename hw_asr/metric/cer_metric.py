@@ -47,3 +47,22 @@ class BeamSearchCERMetric(BaseMetric):
             cers.append(calc_cer(target_text, pred_text))
         return sum(cers) / len(cers)
 
+
+class LanguageModelCERMetric(BaseMetric):
+    def __init__(self, text_encoder: BaseTextEncoder, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.text_encoder = text_encoder
+
+    def __call__(self, logits: Tensor, log_probs_length: Tensor, text: List[str], **kwargs):
+        cers = []
+        logits = logits.detach().cpu().numpy()
+        lengths = log_probs_length.detach().numpy()
+        for logit, length, target_text in zip(logits, lengths, text):
+            target_text = BaseTextEncoder.normalize_text(target_text)
+            if hasattr(self.text_encoder, "ctc_lm_beam_search"):
+                pred_text = self.text_encoder.ctc_lm_beam_search(logit[:length])
+            else:
+                assert False
+            cers.append(calc_cer(target_text, pred_text))
+        return sum(cers) / len(cers)
+

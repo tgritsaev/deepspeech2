@@ -53,7 +53,7 @@ class BaseTrainer:
         )
 
         if config.resume is not None:
-            self._resume_checkpoint(config.resume)
+            self._load_model(config.resume)
 
     @abstractmethod
     def _train_epoch(self, epoch):
@@ -154,6 +154,20 @@ class BaseTrainer:
             torch.save(state, best_path)
             self.logger.info("Saving current best: model_best.pth ...")
 
+    def _load_model(self, resume_path):
+        """
+        Resume from saved checkpoints
+
+        :param resume_path: Checkpoint path to be resumed
+        """
+        resume_path = str(resume_path)
+        self.logger.info("Loading model: {} ...".format(resume_path))
+        checkpoint = torch.load(resume_path, self.device)
+        self.model.load_state_dict(checkpoint["state_dict"])
+        
+        self.logger.info("Model loaded")
+        
+        
     def _resume_checkpoint(self, resume_path):
         """
         Resume from saved checkpoints
