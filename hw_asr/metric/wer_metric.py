@@ -26,8 +26,8 @@ class ArgmaxWERMetric(BaseMetric):
                 pred_text = self.text_encoder.decode(log_prob_vec[:length])
             wers.append(calc_wer(target_text, pred_text))
         return sum(wers) / len(wers)
-    
-    
+
+
 class BeamSearchWERMetric(BaseMetric):
     def __init__(self, text_encoder: BaseTextEncoder, beam_size: int, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -46,8 +46,8 @@ class BeamSearchWERMetric(BaseMetric):
                 assert False
             wers.append(calc_wer(target_text, pred_text))
         return sum(wers) / len(wers)
-    
-    
+
+
 class LanguageModelWERMetric(BaseMetric):
     def __init__(self, text_encoder: BaseTextEncoder, *args, **kwargs):
         super().__init__(*args, **kwargs)

@@ -1,9 +1,9 @@
-fin = open("librispeech-vocab.txt", "r")
-fout = open("ibrispeech-fixed-vocab.txt", "w+")
+fin = open("hw_asr/text_encoder/librispeech-vocab.txt", "r")
+fout = open("hw_asr/text_encoder/librispeech-fixed-vocab.txt", "w+")
 
-while (line := fin.readline()):
+while line := fin.readline():
     line = line.lower().replace("'", "")
     print(line, end="", file=fout)
-    
+
 fin.close()
 fout.close()
