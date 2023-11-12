@@ -11,6 +11,7 @@ from hw_asr.trainer import Trainer
 from hw_asr.utils import ROOT_PATH
 from hw_asr.utils.object_loading import get_dataloaders
 from hw_asr.utils.parse_config import ConfigParser
+from hw_asr.metric.utils import calc_wer
 
 DEFAULT_CHECKPOINT_PATH = ROOT_PATH / "default_test_model" / "checkpoint.pth"
 
@@ -44,6 +45,10 @@ def main(config, out_file):
 
     results = []
 
+    argmax_wer_sum = 0
+    beam_search_wer_sum = 0
+    lm_wer_sum = 0
+
     with torch.no_grad():
         for batch_num, batch in enumerate(tqdm(dataloaders["test"])):
             batch = Trainer.move_batch_to_device(batch, device)
@@ -53,23 +58,50 @@ def main(config, out_file):
             else:
                 batch["logits"] = output
             batch["log_probs"] = torch.log_softmax(batch["logits"], dim=-1)
-            batch["log_probs_length"] = model.transform_input_lengths(
-                batch["spectrogram_length"]
-            )
+            batch["log_probs_length"] = model.transform_input_lengths(batch["spectrogram_length"])
             batch["probs"] = batch["log_probs"].exp().cpu()
             batch["argmax"] = batch["probs"].argmax(-1)
             for i in range(len(batch["text"])):
-                argmax = batch["argmax"][i]
-                argmax = argmax[: int(batch["log_probs_length"][i])]
+                length = int(batch["log_probs_length"][i])
+                ground_truth = batch["text"][i]
+
+                argmax = batch["argmax"][i][:length].cpu().numpy()
+                text_argmax = text_encoder.ctc_decode(argmax)
+
+                probs = batch["probs"][i][:length].detach().cpu().numpy()
+                text_beam_search = text_encoder.ctc_beam_search(probs, beam_size=4)
+
+                logits = batch["logits"][i][:length].detach().cpu().numpy()
+                text_lm = text_encoder.ctc_lm_beam_search(logits)
+
+                argmax_wer = calc_wer(ground_truth, text_argmax) * 100
+                beam_search_wer = calc_wer(ground_truth, text_beam_search) * 100
+                lm_wer = calc_wer(ground_truth, text_lm) * 100
+
+                argmax_wer_sum += argmax_wer
+                beam_search_wer_sum += beam_search_wer
+                lm_wer_sum += lm_wer
+
                 results.append(
                     {
-                        "ground_trurh": batch["text"][i],
-                        "pred_text_argmax": text_encoder.ctc_decode(argmax.cpu().numpy()),
-                        "pred_text_beam_search": text_encoder.ctc_beam_search(
-                            batch["probs"][i], batch["log_probs_length"][i], beam_size=100
-                        )[:10],
+                        "ground_truth": ground_truth,
+                        "pred_text_argmax": text_argmax,
+                        "pred_text_beam_search": text_beam_search,
+                        "pred_text_lm": text_lm,
+                        "argmax_wer": argmax_wer,
+                        "beam_search_wer": beam_search_wer,
+                        "lm_wer": lm_wer,
                     }
                 )
+
+    n = len(results)
+    logger.info("argmax_wer_mean:")
+    logger.info(argmax_wer_sum / n)
+    logger.info("beam_search_wer_mean:")
+    logger.info(beam_search_wer_sum / n)
+    logger.info("lm_wer_mean:")
+    logger.info(lm_wer_sum / n)
+
     with Path(out_file).open("w") as f:
         json.dump(results, f, indent=2)
 
@@ -156,9 +188,7 @@ if __name__ == "__main__":
                         "type": "CustomDirAudioDataset",
                         "args": {
                             "audio_dir": str(test_data_folder / "audio"),
-                            "transcription_dir": str(
-                                test_data_folder / "transcriptions"
-                            ),
+                            "transcription_dir": str(test_data_folder / "transcriptions"),
                         },
                     }
                 ],
